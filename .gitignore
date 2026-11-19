@@ -1,0 +1,27 @@
+# Dependencias y compilación
+node_modules/
+dist/
+web-build/
+.expo/
+coverage/
+
+# Carpetas nativas generadas por Expo (se regeneran con prebuild / EAS)
+/android
+/ios
+
+# Secretos y credenciales de firma
+.env
+.env.*
+!.env.example
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Sistema y editor
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

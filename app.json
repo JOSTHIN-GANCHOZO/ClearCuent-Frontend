@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "ClearCuent",
+    "slug": "clearcuent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "clearcuent",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-background-task",
+      "expo-sharing",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
