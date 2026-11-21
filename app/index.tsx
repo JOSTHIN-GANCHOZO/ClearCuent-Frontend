@@ -1,9 +1,5 @@
-import { Text, View } from 'react-native';
+import { InicioScreen } from '@/features/cuenta/components/InicioScreen';
 
 export default function IndexRoute() {
-  return (
-    <View>
-      <Text>ClearCuent</Text>
-    </View>
-  );
+  return <InicioScreen />;
 }
