@@ -13,7 +13,9 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colores.fondo },
           headerShown: false,
         }}
-      />
+      >
+        <Stack.Screen name="panel" />
+      </Stack>
     </SafeAreaProvider>
   );
 }

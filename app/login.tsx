@@ -1,9 +1,17 @@
+import { useRouter } from 'expo-router';
+
 import { LoginScreen } from '@/features/cuenta/components/LoginScreen';
-import type { ResultadoLoginUi } from '@/features/cuenta/hooks/useLoginViewModel';
+import { useAutenticacionViewModel } from '@/features/cuenta/hooks/useAutenticacionViewModel';
 
 export default function LoginRoute() {
-  // RF-02: la conexión real espera la decisión aprobada para la URL de la API.
-  const iniciarSesionPendiente = async (): Promise<ResultadoLoginUi> => 'errorTecnico';
+  const router = useRouter();
+  const { iniciarSesion } = useAutenticacionViewModel({
+    // RF-02 CA1: un login válido reemplaza el formulario por el panel aprobado.
+    onAutenticado: () => router.replace('/panel'),
+    onRequiereCambioDispositivo: () => router.push('/cambio-dispositivo'),
+    // RF-07 CA5: el código sesion_revocada del contrato dirige a la pantalla ya existente.
+    onSesionRevocada: () => router.replace('/sesion-revocada'),
+  });
 
-  return <LoginScreen onIniciarSesion={iniciarSesionPendiente} />;
+  return <LoginScreen onIniciarSesion={iniciarSesion} />;
 }

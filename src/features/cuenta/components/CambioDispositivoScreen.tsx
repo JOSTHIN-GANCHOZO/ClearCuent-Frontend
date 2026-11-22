@@ -17,8 +17,16 @@ export function CambioDispositivoScreen({
   onCancelar,
   onConfirmar,
 }: CambioDispositivoScreenProps) {
-  const { confirmar, estado } = useCambioDispositivoViewModel({ onConfirmar });
+  const { confirmar, estado, reintentarEnSegundos } = useCambioDispositivoViewModel({
+    onConfirmar,
+  });
   const procesando = estado === 'procesando';
+  const conEspera = estado === 'bloqueado' || estado === 'limiteSolicitudes';
+  const espera = reintentarEnSegundos !== undefined && reintentarEnSegundos > 0;
+  // RF-02 CA3 / RF-07 CA2: se muestra el tiempo informado por el backend sin revelar si el correo existe.
+  const detalleRechazo = espera
+    ? `Intenta nuevamente en ${reintentarEnSegundos} segundos. Si cancelas, conservarás tu sesión anterior.`
+    : 'Intenta nuevamente más tarde. Si cancelas, conservarás tu sesión anterior.';
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.seguro}>
@@ -31,16 +39,20 @@ export function CambioDispositivoScreen({
             </Text>
           </View>
           <Text accessibilityRole="header" style={styles.titulo}>
-            {estado === 'error'
-              ? 'No pudimos completar el cambio de dispositivo'
-              : procesando
-                ? 'Confirmando cambio de dispositivo…'
-                : 'Otra sesión activa'}
+            {conEspera
+              ? estado === 'bloqueado'
+                ? 'Acceso bloqueado temporalmente'
+                : 'Demasiadas solicitudes. Intenta nuevamente más tarde'
+              : estado === 'error'
+                ? 'No pudimos completar el cambio de dispositivo'
+                : procesando
+                  ? 'Confirmando cambio de dispositivo…'
+                  : 'Otra sesión activa'}
           </Text>
 
-          {estado === 'error' ? (
+          {conEspera || estado === 'error' ? (
             <Text accessibilityLiveRegion="polite" style={styles.descripcion}>
-              Intenta nuevamente más tarde. Si cancelas, conservarás tu sesión anterior.
+              {detalleRechazo}
             </Text>
           ) : procesando ? (
             <Text style={styles.descripcion}>Estamos validando tu solicitud. No cierres la aplicación.</Text>
@@ -72,7 +84,7 @@ export function CambioDispositivoScreen({
             <Text style={styles.botonPrincipalTexto}>
               {procesando
                 ? 'Confirmando…'
-                : estado === 'error'
+                : estado === 'error' || conEspera
                   ? 'Intentar nuevamente'
                   : 'Continuar en este dispositivo'}
             </Text>

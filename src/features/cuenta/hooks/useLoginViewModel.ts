@@ -12,7 +12,18 @@ export type EstadoLoginUi =
   | 'limiteSolicitudes'
   | 'errorTecnico';
 
-export type ResultadoLoginUi = Exclude<EstadoLoginUi, 'inicial' | 'procesando'> | 'exito';
+type ResultadoLoginConEspera = {
+  estado: 'bloqueado' | 'limiteSolicitudes';
+  reintentarEnSegundos?: number;
+};
+
+export type ResultadoLoginUi =
+  | Exclude<EstadoLoginUi, 'inicial' | 'procesando'>
+  | ResultadoLoginConEspera
+  | 'cambioDispositivo'
+  // RF-07 CA5: la ruta decide navegar a /sesion-revocada; el formulario no muestra un error.
+  | 'sesionRevocada'
+  | 'exito';
 
 type UseLoginViewModelParams = {
   onIniciarSesion: (datos: LoginForm) => Promise<ResultadoLoginUi>;
@@ -20,6 +31,7 @@ type UseLoginViewModelParams = {
 
 export function useLoginViewModel({ onIniciarSesion }: UseLoginViewModelParams) {
   const [estado, setEstado] = useState<EstadoLoginUi>('inicial');
+  const [reintentarEnSegundos, setReintentarEnSegundos] = useState<number>();
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const form = useForm<LoginForm>({
     defaultValues: { correo: '', contrasena: '' },
@@ -27,14 +39,18 @@ export function useLoginViewModel({ onIniciarSesion }: UseLoginViewModelParams) 
   });
 
   useEffect(() => {
-    if (estado !== 'bloqueado') {
+    if (estado !== 'bloqueado' && reintentarEnSegundos === undefined) {
       return;
     }
 
-    // RF-02 CA3: esta transición visual se ajustará a Retry-After al conectar la API.
-    const desbloqueo = setTimeout(() => setEstado('inicial'), 15 * 60 * 1000);
+    // RF-02 CA3: Retry-After gobierna el bloqueo; 15 minutos conserva el CA si falta el header.
+    const espera = reintentarEnSegundos ?? 15 * 60;
+    const desbloqueo = setTimeout(() => {
+      setEstado('inicial');
+      setReintentarEnSegundos(undefined);
+    }, espera * 1000);
     return () => clearTimeout(desbloqueo);
-  }, [estado]);
+  }, [estado, reintentarEnSegundos]);
 
   const enviar = form.handleSubmit(async (valores) => {
     form.clearErrors();
@@ -53,8 +69,20 @@ export function useLoginViewModel({ onIniciarSesion }: UseLoginViewModelParams) 
     setEstado('procesando');
     try {
       const resultado = await onIniciarSesion(validacion.data);
+      // RF-07 CA5: ambos resultados delegan la navegación; no se muestra un estado de error.
+      if (resultado === 'cambioDispositivo' || resultado === 'sesionRevocada') {
+        setEstado('inicial');
+        setReintentarEnSegundos(undefined);
+        return;
+      }
       if (resultado !== 'exito') {
-        setEstado(resultado);
+        if (typeof resultado === 'string') {
+          setReintentarEnSegundos(undefined);
+          setEstado(resultado);
+        } else {
+          setReintentarEnSegundos(resultado.reintentarEnSegundos);
+          setEstado(resultado.estado);
+        }
       }
     } catch {
       setEstado('errorTecnico');
@@ -66,6 +94,7 @@ export function useLoginViewModel({ onIniciarSesion }: UseLoginViewModelParams) 
     enviar,
     estado,
     mostrarContrasena,
+    reintentarEnSegundos,
     alternarContrasena: () => setMostrarContrasena((visible) => !visible),
   };
 }
