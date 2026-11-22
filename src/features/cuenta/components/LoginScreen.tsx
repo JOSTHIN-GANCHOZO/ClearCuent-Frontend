@@ -53,10 +53,19 @@ export function LoginScreen({
     estado,
     formState: { errors },
     mostrarContrasena,
+    reintentarEnSegundos,
   } = useLoginViewModel({ onIniciarSesion });
   const procesando = estado === 'procesando';
-  const envioBloqueado = procesando || estado === 'bloqueado';
-  const mensaje = MENSAJES[estado];
+  const esperaServidor = reintentarEnSegundos !== undefined && reintentarEnSegundos > 0;
+  const envioBloqueado = procesando || estado === 'bloqueado' || esperaServidor;
+  const mensajeBase = MENSAJES[estado];
+  const mensaje =
+    mensajeBase && reintentarEnSegundos !== undefined
+      ? {
+          ...mensajeBase,
+          detalle: `Intenta nuevamente en ${reintentarEnSegundos} segundos.`,
+        }
+      : mensajeBase;
   const textoBoton = procesando
     ? 'Verificando…'
     : estado === 'sinConexion' ||
