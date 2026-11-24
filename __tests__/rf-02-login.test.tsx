@@ -22,6 +22,31 @@ async function completarFormulario() {
   await fireEvent.changeText(vista.getByPlaceholderText('Ingresa tu contraseña'), CONTRASENA);
 }
 
+// RF-02, login-moderno.md §5: unico trazo condicional del ojo (abierto -> tachado).
+const TRAZO_TACHADO = 'M4 4 L20 20';
+
+type NodoVisual = { props: Record<string, unknown>; children: unknown[] };
+
+function nodoVisual(nodo: unknown): NodoVisual | undefined {
+  if (typeof nodo !== 'object' || nodo === null) return undefined;
+  if (!('props' in nodo) || !('children' in nodo)) return undefined;
+  return nodo as unknown as NodoVisual;
+}
+
+function esperarSvgDecorativo(nodo: unknown) {
+  const svg = nodoVisual(nodo);
+  expect(svg).toBeDefined();
+  expect(svg?.props.accessible).toBe(false);
+  expect(svg?.props.importantForAccessibility).toBe('no-hide-descendants');
+}
+
+function trazosOjo(nombre: 'Mostrar contraseña' | 'Ocultar contraseña'): unknown[] {
+  const boton = vista.getByRole('button', { name: nombre });
+  const svg = nodoVisual(boton.children[0]);
+  const grupo = svg ? nodoVisual(svg.children[0]) : undefined;
+  return grupo?.children.map((trazo) => nodoVisual(trazo)?.props.d) ?? [];
+}
+
 describe('LoginScreen', () => {
   test('RF-02 CA2: valida localmente y comunica cada error con propiedades accesibles nativas', async () => {
     const onIniciarSesion = jest.fn(inicioExitoso);
@@ -192,5 +217,66 @@ describe('LoginScreen', () => {
     expect(logoRenderizado).toContain(`"payload":${colorNativo(coloresMarca.fondoIcono)}`);
     expect(logoRenderizado).toContain(`"payload":${colorNativo(coloresMarca.trazoIcono)}`);
     expect(logoRenderizado).toContain(`"payload":${colorNativo(coloresMarca.acentoIcono)}`);
+  });
+
+  test('RF-02 CA2: el ojo pasa de abierto a tachado al alternar la visibilidad de la contraseña', async () => {
+    await montar(<LoginScreen onIniciarSesion={inicioExitoso} />);
+    const contrasena = vista.getByPlaceholderText('Ingresa tu contraseña');
+
+    expect(vista.getByRole('button', { name: 'Mostrar contraseña' })).toHaveProp(
+      'accessibilityRole',
+      'button',
+    );
+    expect(contrasena).toHaveProp('secureTextEntry', true);
+    expect(trazosOjo('Mostrar contraseña')).not.toContain(TRAZO_TACHADO);
+
+    await fireEvent.press(vista.getByRole('button', { name: 'Mostrar contraseña' }));
+
+    expect(vista.getByRole('button', { name: 'Ocultar contraseña' })).toBeOnTheScreen();
+    expect(contrasena).toHaveProp('secureTextEntry', false);
+    expect(trazosOjo('Ocultar contraseña')).toContain(TRAZO_TACHADO);
+
+    await fireEvent.press(vista.getByRole('button', { name: 'Ocultar contraseña' }));
+
+    expect(vista.getByRole('button', { name: 'Mostrar contraseña' })).toBeOnTheScreen();
+    expect(contrasena).toHaveProp('secureTextEntry', true);
+    expect(trazosOjo('Mostrar contraseña')).not.toContain(TRAZO_TACHADO);
+  });
+
+  test('RF-02 CA2: los iconos guia y el ojo son decorativos y la tarjetita conserva la marca', async () => {
+    await montar(<LoginScreen onIniciarSesion={inicioExitoso} />);
+    const correo = vista.getByPlaceholderText('tu@negocio.com');
+    const contrasena = vista.getByPlaceholderText('Ingresa tu contraseña');
+
+    esperarSvgDecorativo(correo.parent?.children[0]);
+    esperarSvgDecorativo(contrasena.parent?.children[0]);
+    esperarSvgDecorativo(vista.getByRole('button', { name: 'Mostrar contraseña' }).children[0]);
+    expect(vista.getByTestId('fondo-marca')).toBeOnTheScreen();
+    expect(vista.getByLabelText('ClearCuent')).toBeOnTheScreen();
+  });
+
+  test('RF-02 CA2: conserva nativeID de errores y contraste del placeholder en error y procesando', async () => {
+    const onIniciarSesion = jest.fn(inicioExitoso);
+    await montar(<LoginScreen onIniciarSesion={onIniciarSesion} />);
+    await fireEvent.press(vista.getByRole('button', { name: 'Iniciar sesión' }));
+
+    expect(await vista.findByText('Ingresa un correo electrónico válido.')).toHaveProp(
+      'nativeID',
+      'error-correo',
+    );
+    expect(vista.getByText('Ingresa tu contraseña.')).toHaveProp('nativeID', 'error-contrasena');
+
+    await completarFormulario();
+    await fireEvent.press(vista.getByRole('button', { name: 'Iniciar sesión' }));
+
+    expect(await vista.findByText('Verificando…')).toBeOnTheScreen();
+    expect(vista.getByPlaceholderText('tu@negocio.com')).toHaveProp(
+      'placeholderTextColor',
+      colores.textoSecundario,
+    );
+    expect(vista.getByPlaceholderText('Ingresa tu contraseña')).toHaveProp(
+      'placeholderTextColor',
+      colores.textoSecundario,
+    );
   });
 });

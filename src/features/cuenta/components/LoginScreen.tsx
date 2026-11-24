@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Controller } from 'react-hook-form';
 import {
   ActivityIndicator,
@@ -18,6 +19,9 @@ import {
   type ResultadoLoginUi,
   useLoginViewModel,
 } from '@/features/cuenta/hooks/useLoginViewModel';
+import { IconoCandado } from '@/shared/components/IconoCandado';
+import { IconoCorreo } from '@/shared/components/IconoCorreo';
+import { IconoOjo } from '@/shared/components/IconoOjo';
 import { LogoClearCuent } from '@/shared/components/LogoClearCuent';
 import { colores } from '@/shared/theme/colores';
 
@@ -41,6 +45,34 @@ const MENSAJES: Partial<Record<EstadoLoginUi, { titulo: string; detalle?: string
   errorTecnico: { titulo: 'No pudimos completar la solicitud. Intenta nuevamente más tarde' },
 };
 
+type EstadoCampo = 'reposo' | 'foco' | 'error' | 'deshabilitado';
+
+// RF-02, UI/UX aprobada (login-moderno.md §4): prioridad deshabilitado > error > foco > reposo.
+function resolverEstadoCampo(
+  deshabilitado: boolean,
+  conError: boolean,
+  enfocado: boolean,
+): EstadoCampo {
+  if (deshabilitado) return 'deshabilitado';
+  if (conError) return 'error';
+  if (enfocado) return 'foco';
+  return 'reposo';
+}
+
+// RF-02, UI/UX aprobada (login-moderno.md §4-5): trazo del icono guia segun el estado.
+function colorIconoGuia(estado: EstadoCampo): string {
+  switch (estado) {
+    case 'deshabilitado':
+      return colores.textoApagado;
+    case 'error':
+      return colores.error;
+    case 'foco':
+      return colores.primario;
+    default:
+      return colores.textoSecundario;
+  }
+}
+
 export function LoginScreen({
   onCrearCuenta,
   onIniciarSesion,
@@ -55,7 +87,16 @@ export function LoginScreen({
     mostrarContrasena,
     reintentarEnSegundos,
   } = useLoginViewModel({ onIniciarSesion });
+  // RF-02, UI/UX aprobada (§9.1): foco local solo para el estilo, sin tocar RHF ni mensajes.
+  const [correoEnfocado, setCorreoEnfocado] = useState(false);
+  const [contrasenaEnfocada, setContrasenaEnfocada] = useState(false);
   const procesando = estado === 'procesando';
+  const estadoCorreo = resolverEstadoCampo(procesando, Boolean(errors.correo), correoEnfocado);
+  const estadoContrasena = resolverEstadoCampo(
+    procesando,
+    Boolean(errors.contrasena),
+    contrasenaEnfocada,
+  );
   const esperaServidor = reintentarEnSegundos !== undefined && reintentarEnSegundos > 0;
   const envioBloqueado = procesando || estado === 'bloqueado' || esperaServidor;
   const mensajeBase = MENSAJES[estado];
@@ -86,11 +127,16 @@ export function LoginScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.cabecera}>
-            <LogoClearCuent />
-            <Text accessibilityRole="header" style={styles.titulo}>
-              Bienvenido de nuevo
-            </Text>
-            <Text style={styles.subtitulo}>Ingresa para continuar con tu negocio.</Text>
+            <View style={styles.cabeceraContenido}>
+              {/* RF-02, decisión de Josthin 23/11: tarjetita verde que abraza icono y palabra. */}
+              <View style={styles.fondoMarca} testID="fondo-marca">
+                <LogoClearCuent variante="oscuro" />
+              </View>
+              <Text accessibilityRole="header" style={styles.titulo}>
+                Bienvenido de nuevo
+              </Text>
+              <Text style={styles.subtitulo}>Ingresa para continuar con tu negocio.</Text>
+            </View>
           </View>
 
           <View style={styles.tarjeta}>
@@ -115,24 +161,45 @@ export function LoginScreen({
                 control={control}
                 name="correo"
                 render={({ field: { onBlur, onChange, value } }) => (
-                  <TextInput
-                    accessibilityHint={errors.correo?.message ?? 'Ingresa el correo de tu cuenta.'}
-                    accessibilityLabel="Correo electrónico"
-                    accessibilityValue={
-                      errors.correo?.message ? { text: `Error: ${errors.correo.message}` } : undefined
-                    }
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    editable={!procesando}
-                    inputMode="email"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    placeholder="tu@negocio.com"
-                    placeholderTextColor={colores.textoSecundario}
-                    returnKeyType="next"
-                    style={[styles.campo, errors.correo && styles.campoError]}
-                    value={value}
-                  />
+                  <View
+                    style={[
+                      styles.campo,
+                      estadoCorreo === 'foco' && styles.campoFoco,
+                      estadoCorreo === 'error' && styles.campoError,
+                      estadoCorreo === 'deshabilitado' && styles.campoDeshabilitado,
+                    ]}
+                  >
+                    <IconoCorreo color={colorIconoGuia(estadoCorreo)} style={styles.iconoGuia} />
+                    <TextInput
+                      accessibilityHint={errors.correo?.message ?? 'Ingresa el correo de tu cuenta.'}
+                      accessibilityLabel="Correo electrónico"
+                      // RF-02, adicion explicita aprobada (§4 y §7): editable=false no basta para el lector.
+                      accessibilityState={{ disabled: procesando }}
+                      accessibilityValue={
+                        errors.correo?.message
+                          ? { text: `Error: ${errors.correo.message}` }
+                          : undefined
+                      }
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      editable={!procesando}
+                      inputMode="email"
+                      onBlur={() => {
+                        onBlur();
+                        setCorreoEnfocado(false);
+                      }}
+                      onChangeText={onChange}
+                      onFocus={() => setCorreoEnfocado(true)}
+                      placeholder="tu@negocio.com"
+                      placeholderTextColor={colores.textoSecundario}
+                      returnKeyType="next"
+                      style={[
+                        styles.campoTexto,
+                        estadoCorreo === 'deshabilitado' && styles.valorDeshabilitado,
+                      ]}
+                      value={value}
+                    />
+                  </View>
                 )}
               />
               {errors.correo?.message ? (
@@ -148,7 +215,18 @@ export function LoginScreen({
 
             <View style={styles.grupoCampo}>
               <Text style={styles.etiqueta}>Contraseña</Text>
-              <View style={[styles.campoConAccion, errors.contrasena && styles.campoError]}>
+              <View
+                style={[
+                  styles.campo,
+                  estadoContrasena === 'foco' && styles.campoFoco,
+                  estadoContrasena === 'error' && styles.campoError,
+                  estadoContrasena === 'deshabilitado' && styles.campoDeshabilitado,
+                ]}
+              >
+                <IconoCandado
+                  color={colorIconoGuia(estadoContrasena)}
+                  style={styles.iconoGuia}
+                />
                 <Controller
                   control={control}
                   name="contrasena"
@@ -158,6 +236,8 @@ export function LoginScreen({
                         errors.contrasena?.message ?? 'Ingresa la contraseña de tu cuenta.'
                       }
                       accessibilityLabel="Contraseña"
+                      // RF-02, adicion explicita aprobada (§4 y §7): editable=false no basta para el lector.
+                      accessibilityState={{ disabled: procesando }}
                       accessibilityValue={
                         errors.contrasena?.message
                           ? { text: `Error: ${errors.contrasena.message}` }
@@ -166,12 +246,19 @@ export function LoginScreen({
                       autoCapitalize="none"
                       autoComplete="current-password"
                       editable={!procesando}
-                      onBlur={onBlur}
+                      onBlur={() => {
+                        onBlur();
+                        setContrasenaEnfocada(false);
+                      }}
                       onChangeText={onChange}
+                      onFocus={() => setContrasenaEnfocada(true)}
                       placeholder="Ingresa tu contraseña"
                       placeholderTextColor={colores.textoSecundario}
                       secureTextEntry={!mostrarContrasena}
-                      style={styles.campoContrasena}
+                      style={[
+                        styles.campoTexto,
+                        estadoContrasena === 'deshabilitado' && styles.valorDeshabilitado,
+                      ]}
                       value={value}
                     />
                   )}
@@ -184,7 +271,10 @@ export function LoginScreen({
                   onPress={alternarContrasena}
                   style={({ pressed }) => [styles.mostrar, pressed && styles.presionado]}
                 >
-                  <Text style={styles.mostrarTexto}>{mostrarContrasena ? 'Ocultar' : 'Mostrar'}</Text>
+                  <IconoOjo
+                    color={procesando ? colores.textoApagado : colores.primario}
+                    tachado={mostrarContrasena}
+                  />
                 </Pressable>
               </View>
               {errors.contrasena?.message ? (
@@ -267,7 +357,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 28,
   },
-  cabecera: { alignItems: 'center', marginBottom: 28 },
+  cabecera: { alignItems: 'center', marginBottom: 28, position: 'relative' },
+  // Ajuste N-1 de A6: conserva el centrado del bloque de cabecera.
+  cabeceraContenido: { alignItems: 'center', zIndex: 1 },
+  // RF-02, decisión de Josthin 23/11: tarjetita verde; sin capas absolutas ni zIndex.
+  fondoMarca: {
+    alignItems: 'center',
+    backgroundColor: colores.primario,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   titulo: {
     color: colores.verdeProfundo,
     fontSize: 28,
@@ -300,42 +400,38 @@ const styles = StyleSheet.create({
   mensajeDetalle: { color: colores.textoSecundario, fontSize: 13, lineHeight: 19, marginTop: 4 },
   grupoCampo: { marginBottom: 16 },
   etiqueta: { color: colores.textoPrincipal, fontSize: 14, fontWeight: '700', marginBottom: 7 },
+  // RF-02, UI/UX aprobada (§4): fila de campo; estados resueltos por prioridad.
   campo: {
+    alignItems: 'center',
     backgroundColor: colores.superficie,
     borderColor: colores.borde,
-    borderRadius: 13,
-    borderWidth: 1,
-    color: colores.textoPrincipal,
-    fontSize: 16,
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  campoConAccion: {
-    alignItems: 'center',
-    borderColor: colores.borde,
-    borderRadius: 13,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 52,
   },
-  campoContrasena: {
+  campoFoco: { borderColor: colores.primario, borderWidth: 1.5 },
+  campoError: { borderColor: colores.error, borderWidth: 1.5 },
+  campoDeshabilitado: {
+    backgroundColor: colores.superficieSecundaria,
+    borderColor: colores.borde,
+    borderWidth: 1,
+  },
+  iconoGuia: { marginLeft: 14, marginRight: 10 },
+  campoTexto: {
     color: colores.textoPrincipal,
     flex: 1,
     fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  campoError: { borderColor: colores.error, borderWidth: 1.5 },
+  valorDeshabilitado: { color: colores.textoApagado },
   mostrar: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 6,
     minHeight: 44,
-    minWidth: 74,
-    paddingHorizontal: 10,
+    minWidth: 44,
   },
-  mostrarTexto: { color: colores.primario, fontSize: 14, fontWeight: '700' },
   errorCampo: { color: colores.error, fontSize: 13, lineHeight: 18, marginTop: 6 },
   enlaceDerecha: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: -6 },
   enlace: { color: colores.primario, fontSize: 14, fontWeight: '700' },
