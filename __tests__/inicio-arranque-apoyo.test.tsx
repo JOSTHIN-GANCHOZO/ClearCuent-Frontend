@@ -18,7 +18,6 @@ const mockCancelIdleCallback = jest.fn((id: number) => {
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
-
 function obtenerIdlePendiente() {
   const pendiente = tareasIdle.entries().next().value;
   if (!pendiente) throw new Error('No existe una tarea idle sintética pendiente');

@@ -96,12 +96,12 @@ describe('auth.service — mapeo de respuestas de autenticacion', () => {
     expect(resultado).toStrictEqual({ tipo: 'bloqueado', reintentarEnSegundos: undefined });
   });
 
-  test('RF-02 CA3: interpreta Retry-After en formato fecha como segundos restantes', async () => {
+  test('RF-02 CA3: interpreta Retry-After en fecha HTTP válida como segundos restantes', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-11-21T15:00:00.000Z'));
     mockPost.mockRejectedValueOnce(
       crearErrorAxios(429, 'acceso_bloqueado', {
-        'retry-after': '2026-11-21T15:05:00.000Z',
+        'retry-after': 'Sat, 21 Nov 2026 15:05:00 GMT',
       }),
     );
 
